@@ -108,7 +108,7 @@
 }
 
 .weather-data .row:nth-child(1) {
-    border-radius: 50%
+    border-radius: 74% 26% 55% 45% / 35% 64% 36% 65% ;
 }
 
 .weather-data .row:nth-child(2) {
@@ -122,28 +122,6 @@
 .weather-data .row:hover {
     border-radius: 50%;
 }
-
-/* .weather-data .row::before {
-    content: "";
-    top: 50px;
-    left: 10px;
-    width: 35px;
-    height: 35px;
-    background: #fff;
-    border-radius: 50%;
-    opacity: 0.4;
-} */
-
-/* .weather-data .row::after {
-    content: "";
-    top: 50px;
-    left: 10px;
-    width: 15px;
-    height: 15px;
-    background: #ffffffb0;
-    border-radius: 50%;
-    opacity: 0.4;
-} */
 
 .weather-data .row span {
     display: block;
