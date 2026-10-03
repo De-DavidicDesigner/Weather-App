@@ -1,104 +1,146 @@
 import "./Weather.css";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faMagnifyingGlass } from '@fortawesome/free-solid-svg-icons'
+import { useCallback, useEffect, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCircleExclamation } from "@fortawesome/free-solid-svg-icons";
 
-import sunshine from "./img/sunshine.png";
-import wind from "./img/wind.png";
-import humidity from "./img/humidity.png";
-import { useEffect, useRef, useState } from "react";
+import { fetchWeather, getTheme } from "../api/weather";
+import SearchBar from "./SearchBar";
+import CurrentWeather from "./CurrentWeather";
+import HourlyForecast from "./HourlyForecast";
+import WeatherDetails from "./WeatherDetails";
+import DailyForecast from "./DailyForecast";
 
+const DEFAULT_CITY = "Lome";
+
+const storage = {
+  get: (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set: (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* storage unavailable, ignore */
+    }
+  },
+};
 
 export default function Weather() {
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [unit, setUnit] = useState(() => storage.get("unit") || "metric");
+  const latestRequest = useRef(0);
 
-    const inputRef = useRef()
-    const [weatherData, setWeatherData] = useState(false);
-
-    const allIcons = {
-        "01d": "https://openweathermap.org/img/wn/01d@2x.png",
-        "01n": "https://openweathermap.org/img/wn/01n@2x.png",
-        "02d": "https://openweathermap.org/img/wn/02d@2x.png",
-        "02n": "https://openweathermap.org/img/wn/02n@2x.png",
-        "03d": "https://openweathermap.org/img/wn/03d@2x.png",
-        "03n": "https://openweathermap.org/img/wn/03n@2x.png",
-        "04d": "https://openweathermap.org/img/wn/04d@2x.png",
-        "04n": "https://openweathermap.org/img/wn/04n@2x.png",
-        "09d": "https://openweathermap.org/img/wn/09d@2x.png",
-        "09n": "https://openweathermap.org/img/wn/09n@2x.png",
-        "10d": "https://openweathermap.org/img/wn/10d@2x.png",
-        "10n": "https://openweathermap.org/img/wn/10n@2x.png",
-        "11d": "https://openweathermap.org/img/wn/11d@2x.png",
-        "11n": "https://openweathermap.org/img/wn/11n@2x.png",
-        "13d": "https://openweathermap.org/img/wn/13d@2x.png",
-        "13n": "https://openweathermap.org/img/wn/13n@2x.png",
-        "50d": "https://openweathermap.org/img/wn/50d@2x.png",
-        "50n": "https://openweathermap.org/img/wn/50n@2x.png"
+  const load = useCallback(async (location) => {
+    // Ignore responses from searches that have been superseded by a newer one.
+    const requestId = ++latestRequest.current;
+    setLoading(true);
+    setError("");
+    try {
+      const data = await fetchWeather(location);
+      if (requestId !== latestRequest.current) return;
+      setWeather(data);
+      storage.set("city", data.current.city);
+    } catch (err) {
+      if (requestId !== latestRequest.current) return;
+      setError(err instanceof TypeError ? "Network error. Check your connection and try again." : err.message);
+    } finally {
+      if (requestId === latestRequest.current) setLoading(false);
     }
+  }, []);
 
-    const search = async (city)=>{
-        if(city === ""){
-            alert("Enter a City Name");
-            return;
-        }
-        try {
-            const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${import.meta.env.VITE_APP_ID}`;
-            
-            const response = await fetch(url);
-            const data = await response.json();
+  useEffect(() => {
+    load(storage.get("city") || DEFAULT_CITY);
+  }, [load]);
 
-            if(!response.ok){
-                alert(data.message);
-            }
-
-            console.log(data);
-            const icon = allIcons[data.weather[0].icon] || sunshine
-            setWeatherData({
-                humidity: data.main.humidity,
-                location: data.name,
-                windSpeed: data.wind.speed,
-                temperature: Math.floor(data.main.temp),
-                icon: icon
-            })
-        } catch (error) {
-            setWeatherData(false);
-            console.error("Broken API");
-        }
+  const locate = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation isn't supported by your browser.");
+      return;
     }
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => load({ lat: coords.latitude, lon: coords.longitude }),
+      () => {
+        setLoading(false);
+        setError("Couldn't get your location. Allow location access or search for a city.");
+      },
+      { timeout: 10000 }
+    );
+  };
 
-    useEffect(()=>{
-        search("Togo");
-    },[])
+  const toggleUnit = () => {
+    const next = unit === "metric" ? "imperial" : "metric";
+    setUnit(next);
+    storage.set("unit", next);
+  };
+
+  const theme = weather ? getTheme(weather.current.main, weather.current.icon) : "clear-night";
 
   return (
-    <div className='weather'>
-        <div className='search-bar'>
-            <input ref={inputRef} type='text' placeholder='Search' />
-            <p><FontAwesomeIcon icon={faMagnifyingGlass} onClick={()=>search(inputRef.current.value)} /></p>
-        </div>
-        {weatherData ? <>
-            <div className="data">
-                <div className='current-weather'>
-                    <img src={weatherData.icon} alt='sunshine' className='weather-icon' />
-                    <p className='temterature'>{weatherData.temperature}<sup>o</sup>c</p>
-                    <p className='location'>{weatherData.location}</p>
-                </div>
-                <div className="weather-data">
-                    <div className="row">
-                        <img src={humidity} alt="humIcon"></img>
-                        <div>
-                            <p className="p">{weatherData.humidity} %</p>
-                            <span>Humidity</span>
-                        </div>
-                    </div>
-                    <div className="row">
-                        <img src={wind} alt="humIcon"></img>
-                        <div>
-                            <p>{weatherData.windSpeed} km/h</p>
-                            <span>Wind</span>
-                        </div>
-                    </div>
-                </div>
+    <div className={`app theme-${theme}`}>
+      <div className="blob blob-1" aria-hidden="true" />
+      <div className="blob blob-2" aria-hidden="true" />
+      <div className="blob blob-3" aria-hidden="true" />
+
+      <main className="weather">
+        <header className="topbar">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden="true" />
+            Skycast
+          </div>
+          <SearchBar onSearch={load} onLocate={locate} loading={loading} />
+          <button type="button" className="unit-toggle" onClick={toggleUnit} aria-label="Toggle temperature unit">
+            <span className={unit === "metric" ? "active" : ""}>°C</span>
+            <span className={unit === "imperial" ? "active" : ""}>°F</span>
+          </button>
+        </header>
+
+        {error && (
+          <div className="alert" role="alert">
+            <FontAwesomeIcon icon={faCircleExclamation} />
+            {error}
+          </div>
+        )}
+
+        {weather ? (
+          <div className={`dashboard ${loading ? "is-loading" : ""}`} aria-busy={loading}>
+            <CurrentWeather current={weather.current} today={weather.daily[0]} unit={unit} />
+            <div className="side">
+              <HourlyForecast hours={weather.hourly} timezone={weather.current.timezone} unit={unit} />
+              <WeatherDetails current={weather.current} unit={unit} />
             </div>
-        </> : <></>}
+            <DailyForecast days={weather.daily} timezone={weather.current.timezone} unit={unit} />
+          </div>
+        ) : (
+          loading && <Skeleton />
+        )}
+
+        <footer className="footer">
+          Data from{" "}
+          <a href="https://openweathermap.org/" target="_blank" rel="noreferrer">
+            OpenWeather
+          </a>
+        </footer>
+      </main>
     </div>
-  )
+  );
+}
+
+function Skeleton() {
+  return (
+    <div className="dashboard" aria-busy="true" aria-label="Loading weather">
+      <div className="card skeleton hero-skeleton" />
+      <div className="side">
+        <div className="card skeleton" style={{ height: 170 }} />
+        <div className="card skeleton" style={{ height: 260 }} />
+      </div>
+      <div className="card skeleton daily-skeleton" />
+    </div>
+  );
 }

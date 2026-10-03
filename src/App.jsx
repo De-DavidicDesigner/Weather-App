@@ -1,15 +1,5 @@
-import Weather from "./components/Weather"
+import Weather from "./components/Weather";
 
-const App = () => {
-  return (
-    <div className='app' >
-      <div className='circle'></div>
-      <div className='circle'></div>
-      <div className='circle'></div>
-      <div className='circle'></div>
-      <Weather />
-    </div>
-  )
-}
+const App = () => <Weather />;
 
-export default App
+export default App;
